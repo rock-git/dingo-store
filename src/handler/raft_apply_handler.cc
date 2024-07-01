@@ -1039,8 +1039,7 @@ int VectorAddHandler::Handle(std::shared_ptr<Context> ctx, store::RegionPtr regi
   auto prefix = region->GetKeyPrefix();
   auto region_part_id = region->PartitionId();
   for (const auto &vector : request.vectors()) {
-    std::string encode_key_with_ts;
-    VectorCodec::EncodeVectorKey(prefix, region_part_id, vector.id(), ts, encode_key_with_ts);
+    std::string encode_key_with_ts = VectorCodec::EncodeVectorKey(prefix, region_part_id, vector.id(), ts);
 
     // vector data
     {
@@ -1079,8 +1078,7 @@ int VectorAddHandler::Handle(std::shared_ptr<Context> ctx, store::RegionPtr regi
 
       for (const auto &[key, scalar_value] : scalar_key_value_pairs) {
         pb::common::KeyValue kv;
-        std::string encode_key_with_ts;
-        VectorCodec::EncodeVectorKey(prefix, region_part_id, vector.id(), key, ts, encode_key_with_ts);
+        std::string encode_key_with_ts = VectorCodec::EncodeVectorKey(prefix, region_part_id, vector.id(), key, ts);
         kv.mutable_key()->swap(encode_key_with_ts);
 
         std::string value = scalar_value.SerializeAsString();
@@ -1208,8 +1206,7 @@ int VectorDeleteHandler::Handle(std::shared_ptr<Context> ctx, store::RegionPtr r
   std::vector<pb::common::KeyValue> vector_scalar_speedup_kvs;
   for (int i = 0; i < request.ids_size(); ++i) {
     pb::common::KeyValue kv;
-    std::string encode_key_with_ts;
-    VectorCodec::EncodeVectorKey(prefix, partition_id, request.ids(i), ts, encode_key_with_ts);
+    std::string encode_key_with_ts = VectorCodec::EncodeVectorKey(prefix, partition_id, request.ids(i), ts);
     kv.set_key(encode_key_with_ts);
     kv.set_value(mvcc::Codec::ValueFlagDelete());
     vector_kvs.push_back(kv);
@@ -1217,9 +1214,9 @@ int VectorDeleteHandler::Handle(std::shared_ptr<Context> ctx, store::RegionPtr r
     for (const auto &field : scalar_schema.fields()) {
       if (field.enable_speed_up()) {
         pb::common::KeyValue kv;
-        std::string key;
-        VectorCodec::EncodeVectorKey(prefix, partition_id, request.ids(i), field.key(), ts, key);
-        kv.set_key(key);
+        std::string encode_scalar_key_with_ts =
+            VectorCodec::EncodeVectorKey(prefix, partition_id, request.ids(i), field.key(), ts);
+        kv.set_key(encode_scalar_key_with_ts);
         kv.set_value(mvcc::Codec::ValueFlagDelete());
 
         vector_scalar_speedup_kvs.push_back(kv);
@@ -1321,8 +1318,8 @@ int DocumentAddHandler::Handle(std::shared_ptr<Context> ctx, store::RegionPtr re
   auto partition_id = region->PartitionId();
   for (const auto &document : request.documents()) {
     pb::common::KeyValue kv;
-    std::string encode_key_with_ts;
-    DocumentCodec::EncodeDocumentKey(region->GetKeyPrefix(), partition_id, document.id(), ts, encode_key_with_ts);
+    std::string encode_key_with_ts =
+        DocumentCodec::EncodeDocumentKey(region->GetKeyPrefix(), partition_id, document.id(), ts);
 
     kv.mutable_key()->swap(encode_key_with_ts);
 
@@ -1436,8 +1433,7 @@ int DocumentDeleteHandler::Handle(std::shared_ptr<Context> ctx, store::RegionPtr
 
   for (int i = 0; i < request.ids_size(); ++i) {
     pb::common::KeyValue kv;
-    std::string encode_key_with_ts;
-    DocumentCodec::EncodeDocumentKey(prefix, partition_id, request.ids(i), ts, encode_key_with_ts);
+    std::string encode_key_with_ts = DocumentCodec::EncodeDocumentKey(prefix, partition_id, request.ids(i), ts);
     kv.set_key(encode_key_with_ts);
     kv.set_value(mvcc::Codec::ValueFlagDelete());
     kvs.push_back(kv);

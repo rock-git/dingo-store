@@ -489,10 +489,9 @@ void DumpVectorIndexRaw(std::shared_ptr<Context> ctx, dingodb::pb::meta::TableDe
   for (const auto& partition : table_definition.table_partition().partitions()) {
     int64_t partition_id = partition.id().entity_id();
 
-    std::string begin_key, end_key;
     char prefix = dingodb::Helper::GetKeyPrefix(partition.range().start_key());
-    dingodb::VectorCodec::EncodeVectorKey(prefix, partition_id, 0, begin_key);
-    dingodb::VectorCodec::EncodeVectorKey(prefix, partition_id, INT64_MAX, end_key);
+    std::string begin_key = dingodb::VectorCodec::EncodeVectorKey(prefix, partition_id, 0);
+    std::string end_key = dingodb::VectorCodec::EncodeVectorKey(prefix, partition_id, INT64_MAX);
 
     std::cout << fmt::format("=================== vector data partition({}) ====================", partition_id)
               << std::endl;
@@ -551,10 +550,9 @@ void DumpVectorIndexTxn(std::shared_ptr<Context> ctx, dingodb::pb::meta::TableDe
   for (const auto& partition : table_definition.table_partition().partitions()) {
     int64_t partition_id = partition.id().entity_id();
 
-    std::string begin_key, end_key;
     char prefix = dingodb::Helper::GetKeyPrefix(partition.range().start_key());
-    dingodb::VectorCodec::EncodeVectorKey(prefix, partition_id, 0, begin_key);
-    dingodb::VectorCodec::EncodeVectorKey(prefix, partition_id, INT64_MAX, end_key);
+    std::string begin_key = dingodb::VectorCodec::EncodeVectorKey(prefix, partition_id, 0);
+    std::string end_key = dingodb::VectorCodec::EncodeVectorKey(prefix, partition_id, INT64_MAX);
 
     std::cout << fmt::format("=================== vector data partition({}) ====================", partition_id)
               << std::endl;
@@ -698,14 +696,14 @@ void WhichRegion(std::shared_ptr<Context> ctx) {
     } else if (table_definition.index_parameter().index_type() == dingodb::pb::common::INDEX_TYPE_VECTOR) {
       int64_t vector_id = dingodb::Helper::StringToInt64(ctx->key);
 
-      dingodb::VectorCodec::EncodeVectorKey(dingodb::Helper::GetKeyPrefix(range.start_key()), partition_id, vector_id,
-                                            encoded_key);
+      encoded_key = dingodb::VectorCodec::EncodeVectorKey(dingodb::Helper::GetKeyPrefix(range.start_key()),
+                                                          partition_id, vector_id);
 
     } else if (table_definition.index_parameter().index_type() == dingodb::pb::common::INDEX_TYPE_DOCUMENT) {
       int64_t vector_id = dingodb::Helper::StringToInt64(ctx->key);
 
-      dingodb::DocumentCodec::PackageDocumentKey(dingodb::Helper::GetKeyPrefix(range.start_key()), partition_id,
-                                                 vector_id, encoded_key);
+      encoded_key = dingodb::DocumentCodec::PackageDocumentKey(dingodb::Helper::GetKeyPrefix(range.start_key()),
+                                                               partition_id, vector_id);
     }
 
     if (encoded_key >= range.start_key()) {

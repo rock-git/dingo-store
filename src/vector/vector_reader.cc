@@ -63,8 +63,7 @@ DECLARE_bool(dingo_log_switch_coprocessor_scalar_detail);
 butil::Status VectorReader::QueryVectorWithId(int64_t ts, const pb::common::Range& region_range, int64_t partition_id,
                                               int64_t vector_id, bool with_vector_data,
                                               pb::common::VectorWithId& vector_with_id) {
-  std::string plain_key;
-  VectorCodec::PackageVectorKey(Helper::GetKeyPrefix(region_range), partition_id, vector_id, plain_key);
+  std::string plain_key = VectorCodec::PackageVectorKey(Helper::GetKeyPrefix(region_range), partition_id, vector_id);
 
   std::string plain_value;
   auto status = reader_->KvGet(Constant::kVectorDataCF, ts, plain_key, plain_value);
@@ -249,8 +248,7 @@ butil::Status VectorReader::SearchVector(
 
 butil::Status VectorReader::QueryVectorTableData(int64_t ts, const pb::common::Range& region_range,
                                                  int64_t partition_id, pb::common::VectorWithId& vector_with_id) {
-  std::string plain_key;
-  VectorCodec::PackageVectorKey(region_range.start_key()[0], partition_id, vector_with_id.id(), plain_key);
+  std::string plain_key = VectorCodec::PackageVectorKey(region_range.start_key()[0], partition_id, vector_with_id.id());
 
   std::string plain_value;
   auto status = reader_->KvGet(Constant::kVectorTableCF, ts, plain_key, plain_value);
@@ -297,8 +295,8 @@ butil::Status VectorReader::QueryVectorTableData(int64_t ts, const pb::common::R
 butil::Status VectorReader::QueryVectorScalarData(int64_t ts, const pb::common::Range& region_range,
                                                   int64_t partition_id, std::vector<std::string> selected_scalar_keys,
                                                   pb::common::VectorWithId& vector_with_id) {
-  std::string plain_key;
-  VectorCodec::PackageVectorKey(Helper::GetKeyPrefix(region_range), partition_id, vector_with_id.id(), plain_key);
+  std::string plain_key =
+      VectorCodec::PackageVectorKey(Helper::GetKeyPrefix(region_range), partition_id, vector_with_id.id());
 
   std::string plain_value;
   auto status = reader_->KvGet(Constant::kVectorScalarCF, ts, plain_key, plain_value);
@@ -356,8 +354,7 @@ butil::Status VectorReader::CompareVectorScalarData(int64_t ts, const pb::common
                                                     bool& compare_result) {
   compare_result = false;
 
-  std::string plain_key;
-  VectorCodec::PackageVectorKey(Helper::GetKeyPrefix(region_range), partition_id, vector_id, plain_key);
+  std::string plain_key = VectorCodec::PackageVectorKey(Helper::GetKeyPrefix(region_range), partition_id, vector_id);
 
   std::string plain_value;
   auto status = reader_->KvGet(Constant::kVectorScalarCF, ts, plain_key, plain_value);
@@ -394,8 +391,7 @@ butil::Status VectorReader::CompareVectorScalarDataWithCoprocessor(
     const std::shared_ptr<RawCoprocessor>& scalar_coprocessor, bool& compare_result) {
   compare_result = false;
 
-  std::string plain_key;
-  VectorCodec::PackageVectorKey(Helper::GetKeyPrefix(region_range), partition_id, vector_id, plain_key);
+  std::string plain_key = VectorCodec::PackageVectorKey(Helper::GetKeyPrefix(region_range), partition_id, vector_id);
 
   std::string plain_value;
   auto status = reader_->KvGet(Constant::kVectorScalarCF, ts, plain_key, plain_value);
@@ -654,8 +650,8 @@ butil::Status VectorReader::GetBorderId(int64_t ts, const pb::common::Range& reg
 butil::Status VectorReader::ScanVectorId(std::shared_ptr<Engine::VectorReader::Context> ctx,
                                          std::vector<int64_t>& vector_ids) {
   auto& range = ctx->region_range;
-  std::string encode_seek_key;
-  VectorCodec::EncodeVectorKey(Helper::GetKeyPrefix(range), ctx->partition_id, ctx->start_id, encode_seek_key);
+  std::string encode_seek_key =
+      VectorCodec::EncodeVectorKey(Helper::GetKeyPrefix(range), ctx->partition_id, ctx->start_id);
   auto encode_range = mvcc::Codec::EncodeRange(range);
 
   if (!ctx->is_reverse) {

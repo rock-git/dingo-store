@@ -437,7 +437,7 @@ butil::Status Storage::KvScanReleaseV2(std::shared_ptr<Context> /*ctx*/, int64_t
 butil::Status Storage::VectorAdd(std::shared_ptr<Context> ctx, bool is_sync,
                                  const std::vector<pb::common::VectorWithId>& vectors, bool is_update) {
   int64_t ts = ts_provider_->GetTs();
-  if (ts == 0) {
+  if (BAIDU_UNLIKELY(ts == 0)) {
     return butil::Status(pb::error::ETSO_NOT_AVAILABLE, "TSO not available");
   }
 
@@ -446,6 +446,7 @@ butil::Status Storage::VectorAdd(std::shared_ptr<Context> ctx, bool is_sync,
   if (is_sync) {
     auto status = engine->Write(ctx, WriteDataBuilder::BuildWrite(ctx->CfName(), ts, ctx->Ttl(), vectors, is_update));
     auto* response = dynamic_cast<pb::index::VectorAddResponse*>(ctx->Response());
+    CHECK(response != nullptr) << "VectorAddResponse is nullptr.";
     if (status.ok()) {
       response->mutable_key_states()->Resize(vectors.size(), true);
     } else {
@@ -460,6 +461,7 @@ butil::Status Storage::VectorAdd(std::shared_ptr<Context> ctx, bool is_sync,
   return engine->AsyncWrite(ctx, WriteDataBuilder::BuildWrite(ctx->CfName(), ts, ctx->Ttl(), vectors, is_update),
                             [ts, &vectors](std::shared_ptr<Context> ctx, butil::Status status) {
                               auto* response = dynamic_cast<pb::index::VectorAddResponse*>(ctx->Response());
+                              CHECK(response != nullptr) << "VectorAddResponse is nullptr.";
                               if (!status.ok()) {
                                 response->mutable_key_states()->Resize(vectors.size(), false);
                                 Helper::SetPbMessageError(status, ctx->Response());
@@ -474,7 +476,7 @@ butil::Status Storage::VectorAdd(std::shared_ptr<Context> ctx, bool is_sync,
 butil::Status Storage::VectorDelete(std::shared_ptr<Context> ctx, bool is_sync, store::RegionPtr region,
                                     const std::vector<int64_t>& ids) {
   int64_t ts = ts_provider_->GetTs();
-  if (ts == 0) {
+  if (BAIDU_UNLIKELY(ts == 0)) {
     return butil::Status(pb::error::ETSO_NOT_AVAILABLE, "TSO not available");
   }
 
@@ -486,8 +488,7 @@ butil::Status Storage::VectorDelete(std::shared_ptr<Context> ctx, bool is_sync, 
 
   std::vector<bool> key_states(ids.size(), false);
   for (int i = 0; i < ids.size(); ++i) {
-    std::string plain_key;
-    VectorCodec::PackageVectorKey(prefix, region->PartitionId(), ids[i], plain_key);
+    std::string plain_key = VectorCodec::PackageVectorKey(prefix, region->PartitionId(), ids[i]);
 
     std::string value;
     auto status = reader->KvGet(ctx->CfName(), ctx->Ts(), plain_key, value);
@@ -499,6 +500,7 @@ butil::Status Storage::VectorDelete(std::shared_ptr<Context> ctx, bool is_sync, 
   if (is_sync) {
     auto status = engine->Write(ctx, WriteDataBuilder::BuildWrite(ctx->CfName(), ts, ids));
     auto* response = dynamic_cast<pb::index::VectorDeleteResponse*>(ctx->Response());
+    CHECK(response != nullptr) << "VectorDeleteResponse is nullptr.";
     if (status.ok()) {
       for (auto state : key_states) {
         response->add_key_states(state);
@@ -515,6 +517,7 @@ butil::Status Storage::VectorDelete(std::shared_ptr<Context> ctx, bool is_sync, 
   return engine->AsyncWrite(ctx, WriteDataBuilder::BuildWrite(ctx->CfName(), ts, ids),
                             [&ids, &key_states, &ts](std::shared_ptr<Context> ctx, butil::Status status) {
                               auto* response = dynamic_cast<pb::index::VectorDeleteResponse*>(ctx->Response());
+                              CHECK(response != nullptr) << "VectorDeleteResponse is nullptr.";
                               if (!status.ok()) {
                                 response->mutable_key_states()->Resize(ids.size(), false);
                                 Helper::SetPbMessageError(status, ctx->Response());
@@ -743,7 +746,7 @@ butil::Status Storage::VectorBatchSearchDebug(std::shared_ptr<Engine::VectorRead
 butil::Status Storage::DocumentAdd(std::shared_ptr<Context> ctx, bool is_sync,
                                    const std::vector<pb::common::DocumentWithId>& document_with_ids, bool is_update) {
   int64_t ts = ts_provider_->GetTs();
-  if (ts == 0) {
+  if (BAIDU_UNLIKELY(ts == 0)) {
     return butil::Status(pb::error::ETSO_NOT_AVAILABLE, "TSO not available");
   }
 
@@ -752,6 +755,7 @@ butil::Status Storage::DocumentAdd(std::shared_ptr<Context> ctx, bool is_sync,
   if (is_sync) {
     auto status = engine->Write(ctx, WriteDataBuilder::BuildWrite(ctx->CfName(), ts, document_with_ids, is_update));
     auto* response = dynamic_cast<pb::document::DocumentAddResponse*>(ctx->Response());
+    CHECK(response != nullptr) << "DocumentAddResponse is nullptr.";
     if (status.ok()) {
       response->mutable_key_states()->Resize(document_with_ids.size(), true);
     } else {
@@ -766,6 +770,7 @@ butil::Status Storage::DocumentAdd(std::shared_ptr<Context> ctx, bool is_sync,
   return engine->AsyncWrite(ctx, WriteDataBuilder::BuildWrite(ctx->CfName(), ts, document_with_ids, is_update),
                             [ts, &document_with_ids](std::shared_ptr<Context> ctx, butil::Status status) {
                               auto* response = dynamic_cast<pb::document::DocumentAddResponse*>(ctx->Response());
+                              CHECK(response != nullptr) << "DocumentAddResponse is nullptr.";
                               if (!status.ok()) {
                                 response->mutable_key_states()->Resize(document_with_ids.size(), false);
                                 Helper::SetPbMessageError(status, ctx->Response());
@@ -780,7 +785,7 @@ butil::Status Storage::DocumentAdd(std::shared_ptr<Context> ctx, bool is_sync,
 butil::Status Storage::DocumentDelete(std::shared_ptr<Context> ctx, bool is_sync, store::RegionPtr region,
                                       const std::vector<int64_t>& ids) {
   int64_t ts = ts_provider_->GetTs();
-  if (ts == 0) {
+  if (BAIDU_UNLIKELY(ts == 0)) {
     return butil::Status(pb::error::ETSO_NOT_AVAILABLE, "TSO not available");
   }
 
@@ -792,8 +797,7 @@ butil::Status Storage::DocumentDelete(std::shared_ptr<Context> ctx, bool is_sync
 
   std::vector<bool> key_states(ids.size(), false);
   for (int i = 0; i < ids.size(); ++i) {
-    std::string plain_key;
-    DocumentCodec::PackageDocumentKey(prefix, region->PartitionId(), ids[i], plain_key);
+    std::string plain_key = DocumentCodec::PackageDocumentKey(prefix, region->PartitionId(), ids[i]);
 
     std::string value;
     auto status = reader->KvGet(ctx->CfName(), ctx->Ts(), plain_key, value);
@@ -805,6 +809,7 @@ butil::Status Storage::DocumentDelete(std::shared_ptr<Context> ctx, bool is_sync
   if (is_sync) {
     auto status = engine->Write(ctx, WriteDataBuilder::BuildWrite(ctx->CfName(), ts, ids, true));
     auto* response = dynamic_cast<pb::document::DocumentDeleteResponse*>(ctx->Response());
+    CHECK(response != nullptr) << "DocumentDeleteResponse is nullptr.";
     if (status.ok()) {
       for (auto state : key_states) {
         response->add_key_states(state);
@@ -821,6 +826,7 @@ butil::Status Storage::DocumentDelete(std::shared_ptr<Context> ctx, bool is_sync
   return engine->AsyncWrite(ctx, WriteDataBuilder::BuildWrite(ctx->CfName(), ts, ids, true),
                             [&ids, &key_states, &ts](std::shared_ptr<Context> ctx, butil::Status status) {
                               auto* response = dynamic_cast<pb::document::DocumentDeleteResponse*>(ctx->Response());
+                              CHECK(response != nullptr) << "DocumentDeleteResponse is nullptr.";
                               if (!status.ok()) {
                                 response->mutable_key_states()->Resize(ids.size(), false);
                                 Helper::SetPbMessageError(status, ctx->Response());
