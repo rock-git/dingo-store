@@ -291,6 +291,7 @@ class RocksRawEngine : public RawEngine {
   friend rocks::Writer;
   friend rocks::Checkpoint;
 
+  rocksdb::DB* InitDB(const std::string& db_path, rocks::ColumnFamilyMap& column_families);
   std::shared_ptr<rocksdb::DB> GetDB();
 
   rocks::ColumnFamilyPtr GetDefaultColumnFamily();
@@ -300,6 +301,7 @@ class RocksRawEngine : public RawEngine {
   std::string db_path_;
   std::shared_ptr<rocksdb::DB> db_;
   rocks::ColumnFamilyMap column_families_;
+  std::shared_ptr<rocksdb::RateLimiter> rate_limiter_;
 
   RawEngine::ReaderPtr reader_;
   RawEngine::WriterPtr writer_;

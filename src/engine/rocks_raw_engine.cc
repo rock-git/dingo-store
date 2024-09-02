@@ -38,6 +38,7 @@
 #include "engine/raw_engine.h"
 #include "engine/snapshot.h"
 #include "fmt/core.h"
+#include "gflags/gflags.h"
 #include "proto/common.pb.h"
 #include "proto/error.pb.h"
 #include "rocksdb/advanced_options.h"
@@ -45,11 +46,14 @@
 #include "rocksdb/db.h"
 #include "rocksdb/filter_policy.h"
 #include "rocksdb/iterator.h"
+#include "rocksdb/rate_limiter.h"
 #include "rocksdb/table.h"
 #include "rocksdb/write_batch.h"
 
 namespace dingodb {
-DEFINE_bool(enable_rocksdb_sync, false, "enable rocksdb sync ");
+DEFINE_bool(enable_rocksdb_sync, false, "enable rocksdb sync");
+
+DEFINE_int32(rate_bytes_per_sec, 8, "rate bytes per sec");
 namespace rocks {
 
 ColumnFamily::ColumnFamily(const std::string& cf_name, const ColumnFamilyConfig& config,
@@ -459,9 +463,8 @@ butil::Status Writer::KvPut(const std::string& cf_name, const pb::common::KeyVal
   }
 
   rocksdb::WriteOptions write_options;
-  if (FLAGS_enable_rocksdb_sync) {
-    write_options.sync = true;
-  }
+  write_options.sync = FLAGS_enable_rocksdb_sync;
+
   rocksdb::Status s = GetDB()->Put(write_options, GetColumnFamily(cf_name)->GetHandle(), rocksdb::Slice(kv.key()),
                                    rocksdb::Slice(kv.value()));
   if (!s.ok()) {
@@ -495,9 +498,8 @@ butil::Status Writer::KvBatchPut(const std::string& cf_name, const std::vector<p
   }
 
   rocksdb::WriteOptions write_options;
-  if (FLAGS_enable_rocksdb_sync) {
-    write_options.sync = true;
-  }
+  write_options.sync = FLAGS_enable_rocksdb_sync;
+
   rocksdb::Status s = GetDB()->Write(write_options, &batch);
   if (!s.ok()) {
     DINGO_LOG(ERROR) << fmt::format("[rocksdb] write failed, error: {}", s.ToString());
@@ -544,9 +546,8 @@ butil::Status Writer::KvBatchPutAndDelete(const std::string& cf_name,
     }
   }
   rocksdb::WriteOptions write_options;
-  if (FLAGS_enable_rocksdb_sync) {
-    write_options.sync = true;
-  }
+  write_options.sync = FLAGS_enable_rocksdb_sync;
+
   rocksdb::Status s = GetDB()->Write(write_options, &batch);
   if (!s.ok()) {
     DINGO_LOG(ERROR) << fmt::format("[rocksdb] write failed, error: {}", s.ToString());
@@ -606,9 +607,8 @@ butil::Status Writer::KvBatchPutAndDelete(
   }
 
   rocksdb::WriteOptions write_options;
-  if (FLAGS_enable_rocksdb_sync) {
-    write_options.sync = true;
-  }
+  write_options.sync = FLAGS_enable_rocksdb_sync;
+
   rocksdb::Status s = GetDB()->Write(write_options, &batch);
   if (!s.ok()) {
     DINGO_LOG(ERROR) << fmt::format("[rocksdb] write failed, error: {}", s.ToString());
@@ -625,9 +625,8 @@ butil::Status Writer::KvDelete(const std::string& cf_name, const std::string& ke
   }
 
   rocksdb::WriteOptions write_options;
-  if (FLAGS_enable_rocksdb_sync) {
-    write_options.sync = true;
-  }
+  write_options.sync = FLAGS_enable_rocksdb_sync;
+
   rocksdb::Status const s =
       GetDB()->Delete(write_options, GetColumnFamily(cf_name)->GetHandle(), rocksdb::Slice(key.data(), key.size()));
   if (!s.ok()) {
@@ -653,9 +652,7 @@ butil::Status Writer::KvDeleteRange(const std::string& cf_name, const pb::common
     return butil::Status(pb::error::EINTERNAL, "Internal delete range error");
   }
   rocksdb::WriteOptions write_options;
-  if (FLAGS_enable_rocksdb_sync) {
-    write_options.sync = true;
-  }
+  write_options.sync = FLAGS_enable_rocksdb_sync;
 
   s = GetDB()->Write(write_options, &batch);
   if (!s.ok()) {
@@ -686,9 +683,7 @@ butil::Status Writer::KvBatchDeleteRange(const std::map<std::string, std::vector
     }
   }
   rocksdb::WriteOptions write_options;
-  if (FLAGS_enable_rocksdb_sync) {
-    write_options.sync = true;
-  }
+  write_options.sync = FLAGS_enable_rocksdb_sync;
 
   rocksdb::Status s = GetDB()->Write(write_options, &batch);
   if (!s.ok()) {
@@ -868,7 +863,7 @@ static rocksdb::ColumnFamilyOptions GenRocksDBColumnFamilyOptions(rocks::ColumnF
   return family_options;
 }
 
-static rocksdb::DB* InitDB(const std::string& db_path, rocks::ColumnFamilyMap& column_families) {
+rocksdb::DB* RocksRawEngine::InitDB(const std::string& db_path, rocks::ColumnFamilyMap& column_families) {
   // Cast ColumnFamily to rocksdb::ColumnFamilyOptions
   std::vector<rocksdb::ColumnFamilyDescriptor> column_family_descs;
   for (auto [cf_name, column_family] : column_families) {
@@ -883,6 +878,12 @@ static rocksdb::DB* InitDB(const std::string& db_path, rocks::ColumnFamilyMap& c
   db_options.max_background_jobs = ConfigHelper::GetRocksDBBackgroundThreadNum();
   db_options.max_subcompactions = db_options.max_background_jobs / 4 * 3;
   db_options.stats_dump_period_sec = ConfigHelper::GetRocksDBStatsDumpPeriodSec();
+  db_options.use_direct_io_for_flush_and_compaction = true;
+
+  rate_limiter_.reset(rocksdb::NewGenericRateLimiter(1024 * 1024 * FLAGS_rate_bytes_per_sec, 500 * 1000, 10,
+                                                     rocksdb::RateLimiter::Mode::kWritesOnly, false));
+  db_options.rate_limiter = rate_limiter_;
+
   DINGO_LOG(INFO) << fmt::format("[rocksdb] config max_background_jobs({}) max_subcompactions({})",
                                  db_options.max_background_jobs, db_options.max_subcompactions);
 

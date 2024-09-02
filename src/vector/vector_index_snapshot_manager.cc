@@ -36,6 +36,7 @@
 #include "common/service_access.h"
 #include "config/config_manager.h"
 #include "fmt/core.h"
+#include "log/rocks_log_storage.h"
 #include "proto/common.pb.h"
 #include "proto/error.pb.h"
 #include "proto/file_service.pb.h"
@@ -817,9 +818,9 @@ butil::Status VectorIndexSnapshotManager::SaveVectorIndexSnapshot(VectorIndexWra
   }
 
   // Set truncate wal log index.
-  auto log_storage = Server::GetInstance().GetLogStorageManager()->GetLogStorage(vector_index_id);
+  auto log_storage = Server::GetInstance().GetRaftLogStorage();
   if (log_storage != nullptr) {
-    log_storage->TruncateVectorIndexPrefix(apply_log_index);
+    log_storage->TruncatePrefix(wal::ClientType::kVectorIndex, vector_index_id, apply_log_index);
   }
 
   snapshot_log_index = apply_log_index;

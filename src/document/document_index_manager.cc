@@ -1070,7 +1070,7 @@ butil::Status DocumentIndexManager::ReplayWalToDocumentIndex(DocumentIndexPtr do
     return butil::Status(pb::error::Errno::ERAFT_NOT_FOUND, fmt::format("Not found node {}", document_index->Id()));
   }
 
-  auto log_storage = Server::GetInstance().GetLogStorageManager()->GetLogStorage(document_index->Id());
+  auto log_storage = Server::GetInstance().GetRaftLogStorage();
   if (log_storage == nullptr) {
     return butil::Status(pb::error::Errno::EINTERNAL, fmt::format("Not found log stroage {}", document_index->Id()));
   }
@@ -1084,11 +1084,10 @@ butil::Status DocumentIndexManager::ReplayWalToDocumentIndex(DocumentIndexPtr do
   ids.reserve(Constant::kBuildDocumentIndexBatchSize);
 
   int64_t last_log_id = document_index->ApplyLogId();
-  auto log_entrys = log_storage->GetEntrys(start_log_id, end_log_id);
+  auto log_entrys = log_storage->GetEntries(document_index->Id(), start_log_id, end_log_id);
   for (const auto& log_entry : log_entrys) {
     auto raft_cmd = std::make_shared<pb::raft::RaftCmdRequest>();
-    butil::IOBufAsZeroCopyInputStream wrapper(log_entry->data);
-    CHECK(raft_cmd->ParseFromZeroCopyStream(&wrapper));
+    CHECK(raft_cmd->ParseFromString(log_entry->out_data));
     for (auto& request : *raft_cmd->mutable_requests()) {
       switch (request.cmd_type()) {
         case pb::raft::DOCUMENT_ADD: {

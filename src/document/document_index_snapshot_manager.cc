@@ -36,6 +36,7 @@
 #include "config/config_manager.h"
 #include "document/document_index_factory.h"
 #include "fmt/core.h"
+#include "log/rocks_log_storage.h"
 #include "proto/common.pb.h"
 #include "proto/error.pb.h"
 #include "proto/node.pb.h"
@@ -298,9 +299,9 @@ butil::Status DocumentIndexSnapshotManager::SaveDocumentIndexSnapshot(DocumentIn
   document_index->UnlockWrite();
 
   // Set truncate wal log index.
-  auto log_storage = Server::GetInstance().GetLogStorageManager()->GetLogStorage(document_index_id);
+  auto log_storage = Server::GetInstance().GetRaftLogStorage();
   if (log_storage != nullptr) {
-    log_storage->TruncateVectorIndexPrefix(snapshot_log_index);
+    log_storage->TruncatePrefix(wal::ClientType::kVectorIndex, document_index_id, snapshot_log_index);
   }
 
   DINGO_LOG(INFO) << fmt::format(
